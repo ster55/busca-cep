@@ -1,66 +1,77 @@
-import { forwardRef, useImperativeHandle, useState } from "react";
-import axios from "axios";
-import { Form } from "react-bootstrap";
+import { forwardRef, useImperativeHandle, useState } from 'react'
+import axios from 'axios'
 
 const BuscaCep = forwardRef(({ onEnderecoEncontrado }, ref) => {
+  const [cep, setCep] = useState('')
+  const [erro, setErro] = useState('')
+  const [carregando, setCarregando] = useState(false)
 
-    const [cep, setCep] = useState("");
+  function formatarCep(valor) {
+    const digitos = valor.replace(/\D/g, '').slice(0, 8)
+    if (digitos.length > 5) return `${digitos.slice(0, 5)}-${digitos.slice(5)}`
+    return digitos
+  }
 
-    useImperativeHandle(ref, () => ({
-        buscarEndereco
-    }));
+  async function buscarEndereco() {
+    setErro('')
+    const cepLimpo = cep.replace(/\D/g, '')
 
-    async function buscarEndereco(){
-
-        if(cep.length !== 8){
-            alert("Digite um CEP válido.");
-            return;
-        }
-
-        try{
-
-            const resposta = await axios.get(
-                `https://viacep.com.br/ws/${cep}/json/`
-            );
-
-            onEnderecoEncontrado(resposta.data);
-
-        }catch{
-
-            alert("Erro ao consultar CEP.");
-
-        }
-
+    if (cepLimpo.length !== 8) {
+      setErro('CEP inválido — digite os 8 dígitos.')
+      return
     }
 
-    return(
+    setCarregando(true)
+    try {
+      const resposta = await axios.get(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+      if (resposta.data.erro) {
+        setErro('Este CEP não foi encontrado nos Correios.')
+        return
+      }
+      onEnderecoEncontrado(resposta.data)
+    } catch (err) {
+      setErro('Falha na entrega da busca. Tente novamente.')
+    } finally {
+      setCarregando(false)
+    }
+  }
 
-        <Form>
+  useImperativeHandle(ref, () => ({ buscarEndereco }))
 
-            <Form.Group>
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') buscarEndereco()
+  }
 
-                <Form.Label>CEP</Form.Label>
+  return (
+    <div>
+      <label className="cep-label" htmlFor="cep-input">CEP de destino</label>
+      <input
+        id="cep-input"
+        className="cep-input"
+        type="text"
+        inputMode="numeric"
+        placeholder="00000-000"
+        value={cep}
+        onChange={(e) => setCep(formatarCep(e.target.value))}
+        onKeyDown={handleKeyDown}
+        style={{ width: '100%' }}
+      />
 
-                <Form.Control
+      {erro && (
+        <div className="postal-alert">
+          <span>✕</span>
+          <span>{erro}</span>
+        </div>
+      )}
 
-                    type="text"
-                    maxLength={8}
-                    placeholder="Digite apenas números"
+      <div className="route-divider" />
 
-                    value={cep}
+      <button className="btn-postal" onClick={buscarEndereco} disabled={carregando}>
+        {carregando ? 'Buscando…' : 'Buscar CEP'}
+        {!carregando && <span className="icon">→</span>}
+      </button>
+    </div>
+  )
+})
 
-                    onChange={(e)=>
-                        setCep(e.target.value.replace(/\D/g,""))
-                    }
-
-                />
-
-            </Form.Group>
-
-        </Form>
-
-    );
-
-});
-
-export default BuscaCep;
+export default BuscaCep
